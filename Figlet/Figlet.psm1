@@ -447,9 +447,8 @@ function getVerticalSmushDist {
     $curDist = 1
 
     while ($curDist -le $maxDist) {
-      #KWH: Place I may have gotten the Port wrong
-      $subLines1 = $lines1[([Math]::Max(0,$len1 - $curDist)), $len1 - 1]  #slice
-      $subLines2 = $lines2[0, ([Math]::Min($maxDist, $curDist)) - 1]  #slice
+      $subLines1 = Get-JavaArraySlice -Array $lines1 -Start ([Math]::Max(0,$len1 - $curDist)) -End $len1
+      $subLines2 = Get-JavaArraySlice -Array $lines2 -Start 0 -End ([Math]::Min($maxDist, $curDist))
       $slen = $subLines2.Length
       $result = ""
       for ($ii = 0; $ii -lt $slen; $ii++) {
@@ -518,9 +517,9 @@ function verticalSmush {
 
     $len1 = $lines1.Length
     $len2 = $lines2.Length
-    $piece1 = $lines1[0..([Math]::Max(0,$len1 - $overlap) - 1)] #slice
-    $piece2_1 = $lines1[([Math]::Max(0,$len1 - $overlap)), ($len1 - 1)] #slice
-    $piece2_2 = $lines2[0, ([Math]::Min($overlap, $len2) - 1)] #slice
+    $piece1 = Get-JavaArraySlice -Array $lines1 -Start 0 -End ([Math]::Max(0,$len1 - $overlap))
+    $piece2_1 = Get-JavaArraySlice -Array $lines1 -Start ([Math]::Max(0,$len1 - $overlap)) -End $len1
+    $piece2_2 = Get-JavaArraySlice -Array $lines2 -Start 0 -End ([Math]::Min($overlap, $len2))
     $piece2 = @()
     $result = @()
     $len = $piece2_1.Length
@@ -549,13 +548,10 @@ function padLines {
       $padding += ' '
     }
     for ($ii = 0; $ii -lt $len; $ii++) {
-      $lines[$ii] += $padding
+      $lines[$ii] = "$($lines[$ii])$padding"
     }
-
-    # No return here, so guessing $lines is byref, probably want to handle as a return (easier than messing with ref)?
-    # Need to remember to change the call; only used in smushVerticalFigLines
-    $lines
 }
+
 
 function smushVerticalFigLines {
     Param(
