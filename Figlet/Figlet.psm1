@@ -573,8 +573,120 @@ function smushVerticalFigLines {
 
     return (verticalSmush $output $lines $overlap $opt)
 }
+
+<# ----- Main horizontal smush routines (excluding rules) ----- #>
+
+function getHorizontalSmushLength {
+    Param(
+    [string]$txt1,
+    [string]$txt2,
+    $opts
+    )
+
+    # TODO: Run a while/for loop in node and make sure I am getting the essence of "break distCal"
+
+    if ($opts.fittingRules.hLayout -eq $FULL_WIDTH) { return 0 }
+    $len1 = $txt1.Length
+    $len2 = $txt2.Length
+    $maxDist = $len1
+    $curDist = 1
+    $breakAfter = $false
+    $validSmush = $false
+    if ($len1 -eq 0) { return 0 }
+
+    while ($curDist -le $maxDist) {
+      $distCalBreak = $false
+      $seg1 = $txt1.Substring($len1 - $curDist, $curDist)
+      $seg2 = $txt2.Substring(0, ([Math]::Min($curDist,$len2)))
+      for ($ii = 0; $ii -lt ([Math]::Min($curDist,$len2)); $ii++) {
+        $ch1 = $seg1.Substring($ii, 1)
+        $ch2 = $seg2.Substring($ii, 2)
+        if ($ch1 -ne ' ' -and $ch2 -ne ' ') {
+          if ($opts.fittingRules.hLayout -eq $FITTING) {
+            $curDist = $curDist - 1
+            $distCalBreak = $true
+            break
+          } elseif ($opts.fittingRules.hLayout -eq $SMUSHING) {
+            if (($ch1 -eq $opts.hardBlank) -or ($ch2 -eq $opts.hardBlank)) {
+              $curDist = $curDist - 1; # universal smushing does not smush hardblanks
+              $distCalBreak = $true
+              break
+            }
+          } else {
+            $breakAfter = $true # We know we need to break, but we need to check if our smushing ruls will allow us to smush the overlapped characters
+            $validSmush = $false # The below checks will let us know if we can smush these characters
+            $validSmush = if ($opts.fittingRules.hRule1) { hRule1_Smush $ch1 $ch2 $opts.hardBlank } else { $validSmush }
+            $validSmush = if ((-not $validSmush) -and ($opts.fittingRules.hRule2)) { hRule2_Smush $ch1 $ch2 $opts.hardBlank } else { $validSmush }
+            $validSmush = if ((-not $validSmush) -and ($opts.fittingRules.hRule3)) { hRule3_Smush $ch1 $ch2 $opts.hardBlank } else { $validSmush }
+            $validSmush = if ((-not $validSmush) -and ($opts.fittingRules.hRule4)) { hRule4_Smush $ch1 $ch2 $opts.hardBlank } else { $validSmush }
+            $validSmush = if ((-not $validSmush) -and ($opts.fittingRules.hRule5)) { hRule5_Smush $ch1 $ch2 $opts.hardBlank } else { $validSmush }
+            $validSmush = if ((-not $validSmush) -and ($opts.fittingRules.hRule6)) { hRule6_Smush $ch1 $ch2 $opts.hardBlank } else { $validSmush }
+
+            if (-not $validSmush) {
+              $curDist = $curDist - 1
+              $distCalBreak = $true
+              break
+            }
+          }
+        }
+      }
+      if ($distCalBreak -or $breakAfter) { break }
+      $curDist++
+    }
+
+    return ([Math]::Min($maxDist, $curDist))
+}
+
 <#
 
+    function getHorizontalSmushLength(txt1, txt2, opts) {
+        if (opts.fittingRules.hLayout === FULL_WIDTH) {return 0;}
+        var ii, len1 = txt1.length, len2 = txt2.length;
+        var maxDist = len1;
+        var curDist = 1;
+        var breakAfter = false;
+        var validSmush = false;
+        var seg1, seg2, ch1, ch2;
+        if (len1 === 0) {return 0;}
+
+        distCal: while (curDist <= maxDist) {
+            seg1 = txt1.substr(len1-curDist,curDist);
+            seg2 = txt2.substr(0,Math.min(curDist,len2));
+            for (ii = 0; ii < Math.min(curDist,len2); ii++) {
+                ch1 = seg1.substr(ii,1);
+                ch2 = seg2.substr(ii,1);
+                if (ch1 !== " " && ch2 !== " " ) {
+                    if (opts.fittingRules.hLayout === FITTING) {
+                        curDist = curDist - 1;
+                        break distCal;
+                    } else if (opts.fittingRules.hLayout === SMUSHING) {
+                        if (ch1 === opts.hardBlank || ch2 === opts.hardBlank) {
+                            curDist = curDist - 1; // universal smushing does not smush hardblanks
+                        }
+                        break distCal;
+                    } else {
+                        breakAfter = true; // we know we need to break, but we need to check if our smushing rules will allow us to smush the overlapped characters
+                        validSmush = false; // the below checks will let us know if we can smush these characters
+
+                        validSmush = (opts.fittingRules.hRule1) ? hRule1_Smush(ch1,ch2,opts.hardBlank) : validSmush;
+                        validSmush = (!validSmush && opts.fittingRules.hRule2) ? hRule2_Smush(ch1,ch2,opts.hardBlank) : validSmush;
+                        validSmush = (!validSmush && opts.fittingRules.hRule3) ? hRule3_Smush(ch1,ch2,opts.hardBlank) : validSmush;
+                        validSmush = (!validSmush && opts.fittingRules.hRule4) ? hRule4_Smush(ch1,ch2,opts.hardBlank) : validSmush;
+                        validSmush = (!validSmush && opts.fittingRules.hRule5) ? hRule5_Smush(ch1,ch2,opts.hardBlank) : validSmush;
+                        validSmush = (!validSmush && opts.fittingRules.hRule6) ? hRule6_Smush(ch1,ch2,opts.hardBlank) : validSmush;
+
+                        if (!validSmush) {
+                            curDist = curDist - 1;
+                            break distCal;
+                        }
+                    }
+                }
+            }
+            if (breakAfter) {break;}
+            curDist++;
+        }
+        return Math.min(maxDist,curDist);
+    }
 
 
 #>
