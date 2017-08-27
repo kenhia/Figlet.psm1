@@ -1,5 +1,52 @@
 # https://github.com/patorjk/figlet.js
 
+# Need to do some things the JavaScript way for an easier port
+
+function Get-JavaArraySlice {
+<#
+.Synopsis
+  Implement something close to JavaScripts Array.slice()
+.Notes
+https://tc39.github.io/ecma262/#sec-array.prototype.slice
+#>
+    Param(
+    [Parameter(Mandatory)]
+    [Object[]]$Array,
+    [int]$Start,
+    [int]$End
+    )
+    $len = $Array.Length
+    $relativeStart = $Start
+
+    if ($relativeStart -lt 0) {
+      $k = [Math]::Max(($len - $relativeStart), 0)
+    } else {
+      $k = [Math]::Min($relativeStart, $len)
+    }
+
+    if ($End -eq $null) {
+      $relativeEnd = $len
+    } else {
+      $relativeEnd = $End
+    }
+
+    if ($relativeEnd -lt 0) {
+      $final = [Math]::Max(($len + $relativeEnd), 0)
+    } else {
+      $final = [Math]::Min($relativeEnd, $len)
+    }
+
+    $count = [Math]::Max($final - $k, 0)
+
+    if ($count -eq 0) {
+      @()
+    } else {
+      $Array[$k..($k+$count-1)]
+    }
+}
+
+
+
 # Some constants
 $FULL_WIDTH = 0
 $FITTING = 1 
