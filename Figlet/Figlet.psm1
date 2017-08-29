@@ -637,55 +637,97 @@ function getHorizontalSmushLength {
     return ([Math]::Min($maxDist, $curDist))
 }
 
+function horizontalSmush {
+    Param(
+    $textBlock1,
+    $textBlock2,
+    $overlap,
+    $opts
+    )
+
+    $outputFig = @()
+
+    for ($ii = 0; $ii -lt $opts.height; $ii++) {
+        $txt1 = $textBlock1[$ii]
+        $txt2 = $textBlock2[$ii]
+        $len1 = $txt1.Length
+        $len2 = $txt2.Length
+        $overlapStart = $len1 - $overlap
+        $piece1 = $txt1.Substring(0, ([Math]::Max(0, $len1 - $overlapStart)))
+        $piece2 = ''
+
+        # determine overlap piece
+        $seg1 = $txt1.Substring(([Math]::Max(0, $len1 - $overlap)), $overlap)
+        $seg2 = $txt2.Substring(0, ([Math]::Min($overlap, $len2)))
+
+        for ($jj = 0; $jj -lt $overlap; $jj++) {
+            $ch1 = if ($jj -lt $len1) { $seg1.Substring($jj,1) } else { ' ' }
+            $ch2 = if ($jj -lt $len2) { $seg2.Substring($jj,1) } else { ' ' }
+
+            if (($ch1 -ne ' ') -and ($ch2 -ne ' ')) {
+                if ($opts.fittingRules.hLayout -eq $FITTING) {
+                    $piece2 += uni_Smush $ch1 $ch2 $opts.hardBlank
+                } elseif ($opts.fittingRules.hLayout -eq $SMUSHING) {
+                    $piece2 += uni_Smush $ch1 $ch2 $opts.hardBlank
+                } else {
+                    # Controlled Smushing
+                    $nextCh = ''
+                    $nextch = if ((-not $nextCh) -and $opts.fittingRules.hRule1) { hRule1_Smush $ch1 $ch2 $opts.hardBlank } else { $nextCh } 
+                    $nextch = if ((-not $nextCh) -and $opts.fittingRules.hRule2) { hRule2_Smush $ch1 $ch2 $opts.hardBlank } else { $nextCh } 
+                    $nextch = if ((-not $nextCh) -and $opts.fittingRules.hRule3) { hRule3_Smush $ch1 $ch2 $opts.hardBlank } else { $nextCh } 
+                    $nextch = if ((-not $nextCh) -and $opts.fittingRules.hRule4) { hRule4_Smush $ch1 $ch2 $opts.hardBlank } else { $nextCh } 
+                    $nextch = if ((-not $nextCh) -and $opts.fittingRules.hRule5) { hRule5_Smush $ch1 $ch2 $opts.hardBlank } else { $nextCh } 
+                    $nextch = if ((-not $nextCh) -and $opts.fittingRules.hRule6) { hRule6_Smush $ch1 $ch2 $opts.hardBlank } else { $nextCh } 
+                    $nextCh = if ($nextCh -eq $null) { uni_Smush $ch1 $ch2 $opts.hardBlank }
+                    $piece2 += $nextCh
+                }
+            } else {
+                $piece2 += uni_Smush $ch1 $ch2 $opts.hardBlank
+            }
+        }
+        if ($overlap -ge $len2) {
+            $piece3 = ''
+        } else {
+            $piece3 = $txt2.Substring($overlap, ([Math]::Max(0, $len2 - $overlap)))
+        }
+        $output += ($piece1 + $piece2 + $piece3)
+    }
+    return $outputFig
+}
+
+
 <#
 
-    function getHorizontalSmushLength(txt1, txt2, opts) {
-        if (opts.fittingRules.hLayout === FULL_WIDTH) {return 0;}
-        var ii, len1 = txt1.length, len2 = txt2.length;
-        var maxDist = len1;
-        var curDist = 1;
-        var breakAfter = false;
-        var validSmush = false;
-        var seg1, seg2, ch1, ch2;
-        if (len1 === 0) {return 0;}
-
-        distCal: while (curDist <= maxDist) {
-            seg1 = txt1.substr(len1-curDist,curDist);
-            seg2 = txt2.substr(0,Math.min(curDist,len2));
-            for (ii = 0; ii < Math.min(curDist,len2); ii++) {
-                ch1 = seg1.substr(ii,1);
-                ch2 = seg2.substr(ii,1);
-                if (ch1 !== " " && ch2 !== " " ) {
-                    if (opts.fittingRules.hLayout === FITTING) {
-                        curDist = curDist - 1;
-                        break distCal;
-                    } else if (opts.fittingRules.hLayout === SMUSHING) {
-                        if (ch1 === opts.hardBlank || ch2 === opts.hardBlank) {
-                            curDist = curDist - 1; // universal smushing does not smush hardblanks
-                        }
-                        break distCal;
-                    } else {
-                        breakAfter = true; // we know we need to break, but we need to check if our smushing rules will allow us to smush the overlapped characters
-                        validSmush = false; // the below checks will let us know if we can smush these characters
-
-                        validSmush = (opts.fittingRules.hRule1) ? hRule1_Smush(ch1,ch2,opts.hardBlank) : validSmush;
-                        validSmush = (!validSmush && opts.fittingRules.hRule2) ? hRule2_Smush(ch1,ch2,opts.hardBlank) : validSmush;
-                        validSmush = (!validSmush && opts.fittingRules.hRule3) ? hRule3_Smush(ch1,ch2,opts.hardBlank) : validSmush;
-                        validSmush = (!validSmush && opts.fittingRules.hRule4) ? hRule4_Smush(ch1,ch2,opts.hardBlank) : validSmush;
-                        validSmush = (!validSmush && opts.fittingRules.hRule5) ? hRule5_Smush(ch1,ch2,opts.hardBlank) : validSmush;
-                        validSmush = (!validSmush && opts.fittingRules.hRule6) ? hRule6_Smush(ch1,ch2,opts.hardBlank) : validSmush;
-
-                        if (!validSmush) {
-                            curDist = curDist - 1;
-                            break distCal;
-                        }
-                    }
-                }
-            }
-            if (breakAfter) {break;}
-            curDist++;
+    function generateFigTextLine(txt, figChars, opts) {
+        var charIndex, figChar, overlap = 0, row, outputFigText = [], len=opts.height;
+        for (row = 0; row < len; row++) {
+            outputFigText[row] = "";
         }
-        return Math.min(maxDist,curDist);
+        if (opts.printDirection === 1) {
+            txt = txt.split('').reverse().join('');
+        }
+        len=txt.length;
+        for (charIndex = 0; charIndex < len; charIndex++) {
+            figChar = figChars[txt.substr(charIndex,1).charCodeAt(0)];
+            if (figChar) {
+                if (opts.fittingRules.hLayout !== FULL_WIDTH) {
+                    overlap = 10000;// a value too high to be the overlap
+                    for (row = 0; row < opts.height; row++) {
+                        overlap = Math.min(overlap, getHorizontalSmushLength(outputFigText[row], figChar[row], opts));
+                    }
+                    overlap = (overlap === 10000) ? 0 : overlap;
+                }
+                outputFigText = horizontalSmush(outputFigText, figChar, overlap, opts);
+            }
+        }
+        // remove hardblanks
+        if (opts.showHardBlanks !== true) {
+            len = outputFigText.length;
+            for (row = 0; row < len; row++) {
+                outputFigText[row] = outputFigText[row].replace(new RegExp("\\"+opts.hardBlank,"g")," ");
+            }
+        }
+        return outputFigText;
     }
 
 
